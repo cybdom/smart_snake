@@ -5,8 +5,8 @@ two-branch feature extractor, followed by custom (separate) actor and critic MLP
 
            grid (5 x 14 x 14)                     features (14)
                   |                                     |
-   Conv3x3(32)+ReLU -> Conv3x3(64)+ReLU          Linear(64)+ReLU
-   Conv3x3(64, stride 2)+ReLU -> Flatten         Linear(64)+ReLU
+   Conv3x3(32)+ReLU -> Conv3x3(64, s2)+ReLU      Linear(64)+ReLU
+   Conv3x3(64)+ReLU -> Flatten                   Linear(64)+ReLU
    Linear(256)+ReLU                                     |
                   \\_______________ concat ______________/
                                 (320)
@@ -30,14 +30,14 @@ class SnakeFeatureExtractor(BaseFeaturesExtractor):
         feat_space = observation_space["features"]
         c = grid_space.shape[0]
 
-        # Spatial branch: keeps full resolution in the first layers (the board is tiny),
-        # then a strided conv to aggregate a global view of the board.
+        # Spatial branch: first layer at full resolution (local patterns: head next to body/wall),
+        # then a strided conv halves the map (14 -> 7) and a last conv aggregates wider context.
         self.cnn = nn.Sequential(
             nn.Conv2d(c, 32, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Flatten(),
         )

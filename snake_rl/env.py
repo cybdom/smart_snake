@@ -6,12 +6,13 @@ MDP summary
                   0 = go straight, 1 = turn right, 2 = turn left.
                   (Relative actions make the reverse/suicide move impossible by design.)
 * Observation   : Dict
-    - "grid"     : float32 (5, H+2, W+2) image with a 1-cell wall border
+    - "grid"     : float32 (5, H+2, W+2) image with a 1-cell wall border, rotated so the
+                   snake always faces UP (egocentric view, consistent with relative actions)
                    ch0 head, ch1 body (1.0 at neck -> ~0 at tail, encodes order),
                    ch2 food, ch3 poison, ch4 walls + obstacles
     - "features" : float32 (14,) hand-crafted vector
                    danger straight/right/left (3), heading one-hot (4),
-                   food dx, dy (2), nearest poison dx, dy (2),
+                   food (ahead, right) offsets (2), nearest poison (ahead, right) (2),
                    hunger ratio (1), length ratio (1), poison-ahead flag (1)
 * Reward        : see `RewardConfig` (food, poison, death, win, step, distance shaping)
 * Termination   : death (wall / obstacle / self / poison / starvation) or win.
@@ -63,6 +64,7 @@ class SnakeEnv(gym.Env):
         self.render_mode = render_mode
         self.caption = caption
         g = self.cfg.game
+        assert g.width == g.height, "egocentric (rotated) grid observation requires a square board"
         self.game = SnakeGame(g, rng=np.random.default_rng())
 
         self.action_space = spaces.Discrete(3)
@@ -162,6 +164,16 @@ class SnakeEnv(gym.Env):
 # Observation builders (module-level so they can be unit-tested / reused)
 # ---------------------------------------------------------------------------
 def build_grid(g: SnakeGame) -> np.ndarray:
+    """Board image, rotated so that the snake's heading always points UP (egocentric view).
+
+    With relative actions, an egocentric view means 'turn right' always corresponds to the
+    same side of the image, which makes the policy much easier to learn.
+    """
+    grid = _build_absolute_grid(g)
+    return np.ascontiguousarray(np.rot90(grid, k=int(g.direction), axes=(1, 2)))
+
+
+def _build_absolute_grid(g: SnakeGame) -> np.ndarray:
     W, H = g.cfg.width, g.cfg.height
     grid = np.zeros((N_CHANNELS, H + 2, W + 2), dtype=np.float32)
     # walls (border) + obstacles
@@ -193,13 +205,18 @@ def build_features(g: SnakeGame) -> np.ndarray:
         f[i] = float(g.is_deadly(g.next_pos(nd)))
     f[3 + int(d)] = 1.0
     hx, hy = g.head
+    # egocentric coordinates: component along the heading ("ahead") and to its right
+    fx, fy = d.delta
+    rx, ry = d.turn_right().delta
     if g.food is not None:
-        f[7] = (g.food[0] - hx) / W
-        f[8] = (g.food[1] - hy) / H
+        dx, dy = g.food[0] - hx, g.food[1] - hy
+        f[7] = (dx * fx + dy * fy) / W  # > 0: food is ahead
+        f[8] = (dx * rx + dy * ry) / W  # > 0: food is to the right
     if g.poison:
         px, py = min(g.poison, key=lambda p: abs(p[0] - hx) + abs(p[1] - hy))
-        f[9] = (px - hx) / W
-        f[10] = (py - hy) / H
+        dx, dy = px - hx, py - hy
+        f[9] = (dx * fx + dy * fy) / W
+        f[10] = (dx * rx + dy * ry) / W
         f[13] = float(g.next_pos(d) in g.poison)
     f[11] = g.hunger / g.cfg.hunger_limit
     f[12] = g.length / (W * H)

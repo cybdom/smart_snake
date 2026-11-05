@@ -119,13 +119,11 @@ class Renderer:
         extra_txt = "   ".join(f"{k}: {v}" for k, v in extra.items())
         if extra_txt:
             s.blit(self.small.render(extra_txt, True, MUTED), (10, 40))
-        # hunger bar (right side)
-        bar_w, bar_h = 110, 12
-        x0, y0 = self.size[0] - bar_w - 10, 14
+        # hunger / energy bar: thin full-width strip at the bottom of the HUD
         frac = max(0.0, 1.0 - g.hunger / g.cfg.hunger_limit)
-        s.blit(self.small.render("energy", True, MUTED), (x0 - 58, y0 - 2))
-        pg.draw.rect(s, (60, 62, 72), (x0, y0, bar_w, bar_h), border_radius=4)
-        pg.draw.rect(s, HUNGER_OK if frac > 0.3 else HUNGER_LOW, (x0, y0, int(bar_w * frac), bar_h), border_radius=4)
+        y0, bar_h = HUD_H - 6, 4
+        pg.draw.rect(s, (60, 62, 72), (0, y0, self.size[0], bar_h))
+        pg.draw.rect(s, HUNGER_OK if frac > 0.3 else HUNGER_LOW, (0, y0, int(self.size[0] * frac), bar_h))
 
     def _draw_eyes(self, head, direction: Direction) -> None:
         cx, cy = self._center(*head)
