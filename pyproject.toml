@@ -1,0 +1,25 @@
+[project]
+name = "smart-snake"
+version = "0.1.0"
+description = "Smart Snake: a Snake-like game environment (with obstacles, moving poison and hunger) for Deep Reinforcement Learning"
+readme = "README.md"
+requires-python = ">=3.10, <3.14"
+dependencies = [
+    "gymnasium>=1.0",
+    "ipykernel>=6.29",
+    "matplotlib>=3.8",
+    "nbconvert>=7.16",
+    "nbformat>=5.10",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pygame>=2.6",
+    "stable-baselines3>=2.4",
+    "tensorboard>=2.17",
+    "torch>=2.4",
+    "tqdm>=4.66",
+    "rich>=13.7",
+    "jupyter>=1.1",
+]
+
+[tool.uv]
+package = false
