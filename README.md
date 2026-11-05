@@ -53,13 +53,21 @@ All values are defined in [snake_rl/config.py](snake_rl/config.py).
 **Custom network** ([snake_rl/networks.py](snake_rl/networks.py)). This is not an SB3 default policy:
 
 ```
-grid 5x14x14 ─ Conv3x3(32) ─ Conv3x3(64) ─ Conv3x3(64, stride 2) ─ Flatten ─ Linear(256) ┐
-features 14  ─ Linear(64) ─ Linear(64) ──────────────────────────────────────────────────┴─ concat(320)
+grid 5x14x14 ─ Conv3x3(32) ─ Conv3x3(64, s2) ─ Conv3x3(64) ─ Flatten ─ Linear(128) ─ LayerNorm ┐
+features 14  ─ Linear(64) ─ Linear(64) ────────────────────────────────────────────────────────┤
+features 14  ─ (skip connection) ──────────────────────────────────────────────────────────────┴─ concat(206)
         ├─ actor : Linear(128) ─ Linear(64) ─ 3 logits
         └─ critic: Linear(128) ─ Linear(64) ─ V(s)            (all activations ReLU)
 ```
-The convolutions keep the full resolution because the board is tiny (SB3's NatureCNN needs ≥36×36 inputs).
-The vector branch gives the network precise local danger information.
+Design choices, each checked with short diagnostic runs:
+* **Egocentric grid.** The board image is rotated so the snake always faces up, which matches the relative
+  action space. With absolute coordinates, PPO had not learned to eat after 100k steps.
+* **Small CNN.** The board is tiny, so the CNN keeps full resolution in its first layer and then strides once
+  (SB3's NatureCNN needs ≥36×36 inputs).
+* **LayerNorm and skip connection.** In the first version, a 256-dim CNN embedding that was still noise early in
+  training drowned out the informative vector features, and learning was much slower than with the features
+  alone. The LayerNorm keeps both branches on the same scale, and the skip connection passes the raw features
+  directly to the heads.
 
 | Hyperparameter | Value | Reason |
 |---|---|---|

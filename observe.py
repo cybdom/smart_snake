@@ -3,7 +3,7 @@
 Usage:
     uv run observe.py                         # trained PPO agent (models/ppo_snake/best_model.zip)
     uv run observe.py --agent rule            # rule-based agent
-    uv run observe.py --agent rl --seed 3 --fps 20
+    uv run observe.py --agent rl --seed 3 --fps 20   # replay a specific map (default: random seed)
     uv run observe.py --agent rl --gif results/episode.gif   # also save the episode as a GIF
 """
 
@@ -21,7 +21,7 @@ def main():
     p = argparse.ArgumentParser(description="Watch an agent play Smart Snake")
     p.add_argument("--agent", choices=["rl", "rule"], default="rl")
     p.add_argument("--model", default="models/ppo_snake/best_model.zip")
-    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--seed", type=int, default=None, help="map/episode seed (default: random)")
     p.add_argument("--fps", type=float, default=12)
     p.add_argument("--gif", default=None, help="optional path to save the episode as an animated GIF")
     args = p.parse_args()
@@ -37,7 +37,14 @@ def main():
         act = lambda env, obs: agent.predict(env.game)  # noqa: E731
         name = "Rule-based"
 
-    env = SnakeEnv(render_mode="human", caption=name)
+    if args.seed is None:
+        # OS entropy: unaffected by PPO.load(), which re-seeds Python's global `random`
+        import secrets
+
+        args.seed = secrets.randbelow(1_000_000)
+    print(f"Seed {args.seed}  (replay this episode with --seed {args.seed})")
+
+    env = SnakeEnv(render_mode="human", caption=f"{name}  seed {args.seed}")
     env.metadata["render_fps"] = args.fps
     obs, info = env.reset(seed=args.seed)
     frames = []
